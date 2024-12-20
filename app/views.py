@@ -1,5 +1,15 @@
 # -*- coding:utf-8 -*-
 
+"""
+视图函数模块,处理所有HTTP请求路由
+
+主要功能:
+- 文件上传与处理
+- 数据包分析与展示
+- 流量分析与可视化
+- 数据提取与导出
+"""
+
 from app import app
 from flask import (
     render_template,
@@ -44,25 +54,31 @@ from scapy.all import rdpcap
 import os
 import hashlib
 
-# 导入函数到模板中
+# 导入函数到模板中供jinja2使用
 app.jinja_env.globals["enumerate"] = enumerate
 
 # 全局变量
-PCAP_NAME = ""  # 传文件名
-PD = PcapDecode()  # 解析器
-PCAPS = None  # 数据包
+PCAP_NAME = ""  # 当前处理的pcap文件名
+PD = PcapDecode()  # pcap解析器实例
+PDF_NAME = ""  # 导出PDF文件名
+PCAPS = None  # 当前加载的数据包集合
 
 
-# 首页
 @app.route("/", methods=["POST", "GET"])
 @app.route("/index/", methods=["POST", "GET"])
 def index():
+    """首页视图函数"""
     return render_template("./home/index.html")
 
 
-# 数据包上传
 @app.route("/upload/", methods=["POST", "GET"])
 def upload():
+    """
+    处理数据包上传
+    
+    支持pcap/pcapng格式文件上传,并进行格式验证
+    上传成功后加载数据包到内存中供后续分析
+    """
     filepath = app.config["UPLOAD_FOLDER"]
     upload = Upload()
     if request.method == "GET":
@@ -90,9 +106,13 @@ def upload():
     return render_template("./upload/upload.html")
 
 
-# 基本信息页
 @app.route("/database/", methods=["POST", "GET"])
 def basedata():
+    """
+    基本数据包信息展示
+    
+    展示数据包的基本信息,支持按协议类型、源/目的IP等条件过滤
+    """
     global PCAPS, PD
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
@@ -110,12 +130,13 @@ def basedata():
         return render_template("./dataanalyzer/basedata.html", pcaps=pcaps)
 
 
-PDF_NAME = ""
-
-
-# 基本信息页的详细数据
 @app.route("/datashow/", methods=["POST", "GET"])
 def datashow():
+    """
+    展示单个数据包的详细信息
+    
+    根据数据包ID显示其详细解析信息,并生成PDF格式报告
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -132,9 +153,9 @@ def datashow():
             return redirect(url_for("upload"))
 
 
-# 详细数据弹出后的保存至pdf
 @app.route("/savepdf/", methods=["POST", "GET"])
 def savepdf():
+    """下载数据包详情的PDF报告"""
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -144,9 +165,18 @@ def savepdf():
         )
 
 
-# 协议分析页
 @app.route("/protoanalyzer/", methods=["POST", "GET"])
 def protoanalyzer():
+    """
+    协议分析统计
+    
+    统计分析:
+    - 常见协议分布
+    - 数据包长度分布
+    - HTTP请求统计
+    - DNS查询统计
+    - 最常见协议TOP统计
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -185,9 +215,18 @@ def protoanalyzer():
         )
 
 
-# 流量分析页
 @app.route("/flowanalyzer/", methods=["POST", "GET"])
 def flowanalyzer():
+    """
+    流量分析统计
+    
+    分析:
+    - 时间流量分布
+    - 数据流向分析
+    - 内外网数据流向
+    - 协议流量分布
+    - 最大流量会话TOP10
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -218,9 +257,13 @@ def flowanalyzer():
         )
 
 
-# 访问地图页
 @app.route("/ipmap/", methods=["POST", "GET"])
 def ipmap():
+    """
+    IP地理位置分布
+    
+    分析IP地理位置分布,生成可视化地图
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -250,9 +293,13 @@ def ipmap():
             return render_template("./error/neterror.html")
 
 
-# Web数据页
 @app.route("/webdata/", methods=["POST", "GET"])
 def webdata():
+    """
+    Web数据提取
+    
+    提取HTTP请求和响应数据
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -266,9 +313,13 @@ def webdata():
             return render_template("./dataextract/webdata.html", webdata=webdata_list)
 
 
-# Mail数据页
 @app.route("/maildata/", methods=["POST", "GET"])
 def maildata():
+    """
+    邮件数据提取
+    
+    提取邮件协议(SMTP/POP3/IMAP)数据,支持附件下载
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -317,9 +368,13 @@ def maildata():
             return render_template("./dataextract/maildata.html", maildata=mailata_list)
 
 
-# FTP数据页
 @app.route("/ftpdata/", methods=["POST", "GET"])
 def ftpdata():
+    """
+    FTP数据提取
+    
+    提取FTP会话数据和文件传输记录
+    """
     if PCAPS is None:
         flash("请先上传要分析得数据包!")
         return redirect(url_for("upload"))
@@ -333,9 +388,13 @@ def ftpdata():
             return render_template("./dataextract/ftpdata.html", ftpdata=ftpdata_list)
 
 
-# Telnet数据页
 @app.route("/telnetdata/", methods=["POST", "GET"])
 def telnetdata():
+    """
+    Telnet数据提取
+    
+    提取Telnet会话数据和命令记录
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -351,9 +410,13 @@ def telnetdata():
             )
 
 
-# 客户端信息页
 @app.route("/clientinfo/", methods=["POST", "GET"])
 def clientinfo():
+    """
+    客户端信息提取
+    
+    提取HTTP请求中的客户端信息(浏览器、操作系统等)
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -364,9 +427,13 @@ def clientinfo():
         )
 
 
-# 敏感数据页
 @app.route("/sendata/", methods=["POST", "GET"])
 def sendata():
+    """
+    敏感信息提取
+    
+    提取可能包含敏感信息的数据包(密码、token等)
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -386,9 +453,13 @@ def sendata():
             return redirect(url_for("upload"))
 
 
-# 异常数据页
 @app.route("/exceptinfo/", methods=["POST", "GET"])
 def exceptinfo():
+    """
+    异常数据分析
+    
+    检测并展示可疑的异常数据包
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -405,9 +476,13 @@ def exceptinfo():
             return render_template("./exceptions/exception.html", warning=warning_list)
 
 
-# Web文件提取页
 @app.route("/webfile/", methods=["POST", "GET"])
 def webfile():
+    """
+    Web文件提取
+    
+    提取HTTP传输的文件
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -431,9 +506,13 @@ def webfile():
             return render_template("./fileextract/webfile.html", web_list=web_list)
 
 
-# 所有文件提取页
 @app.route("/allfile/", methods=["POST", "GET"])
 def allfile():
+    """
+    所有文件提取
+    
+    提取所有协议中传输的文件
+    """
     if PCAPS is None:
         flash("请先上传要分析的数据包!")
         return redirect(url_for("upload"))
@@ -457,9 +536,11 @@ def allfile():
 
 @app.errorhandler(404)
 def not_found_error(error):
+    """404错误处理"""
     return render_template("./error/404.html"), 404
 
 
 @app.errorhandler(500)
 def server_error(error):
+    """500错误处理"""
     return render_template("./error/500.html"), 500
